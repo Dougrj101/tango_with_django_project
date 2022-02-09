@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from datetime import datetime
 
 def index(request):
     #Query the database for a list of ALL categories currently stored. Order
@@ -19,16 +20,23 @@ def index(request):
     context_dict = {'boldmessage': 'Cruncy, creamy, cookie, candy, cupcake!'}
     context_dict["categories"] = category_list
     context_dict["pages"] = page_list
-    
-    #Render the response to send it back
-    return render(request, 'rango/index.html', context=context_dict)
+
+    visitor_cookie_handler(request)
+    response = render(request, "rango/index.html", context=context_dict)
+    return response
 
 def about(request):
     #prints out whether the method is a GET or a POST
     print(request.method)
     #prints out the user name, if no one is logged in it prints 'AnonymousUser
     print(request.user)
-    return render(request, 'rango/about.html', {})
+
+    context_dict = {}
+    
+    visitor_cookie_handler(request)
+    context_dict["visits"] = request.session["visits"]
+    response = render(request, "rango/about.html", context=context_dict)
+    return response
 
 def show_category(request, category_name_slug):
     #Create a conetxt dictionary which we can pass to the template rendering
@@ -59,6 +67,7 @@ def show_category(request, category_name_slug):
     #go render the response and return it to the client
     return render(request, "rango/category.html", context=context_dict)
 
+@login_required
 def add_category(request):
     form = CategoryForm()
 
@@ -83,6 +92,7 @@ def add_category(request):
     #the form with error messages (if any)
     return render(request, "rango/add_category.html", {"form":form})
 
+@login_required
 def add_page(request, category_name_slug):
     try:
         category = Category.objects.get(slug=category_name_slug)
@@ -210,14 +220,40 @@ def user_login(request):
 
 @login_required    
 def restricted(request):
-    return HttpResponse("Since you're logged in, you can see this text!")
+    #return HttpResponse("Since you're logged in, you can see this text!")
+    return render(request, "rango/restricted.html")
 
-@login required
+@login_required
 def user_logout(request):
     #Since we know the user is logged in we can now just log them out
     logout(request)
     #take the user back to the homepage
     return redirect(reverse("rango:index"))
+
+def get_server_side_cookie(request, cookie, default_val=None):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
+
+def visitor_cookie_handler(request):
+    visits = int(get_server_side_cookie(request, "visits", "1"))
+    last_visit_cookie = get_server_side_cookie(request, "last_visit", str(datetime.now()))
+    last_visit_time = datetime.strptime(last_visit_cookie[:-7],
+                                        "%Y-%m-%d %H:%M:%S")
+    
+    #If its been more than a day since the last visit...
+    if (datetime.now() - last_visit_time).days > 0:
+        visits = visits + 1
+        #update the last visit cookie now that we have updated the count
+        request.session["last_visit"] = str(datetime.now())
+    else:
+        #set the last visit cookie
+        request.session["last_visit"] = last_visit_cookie
+
+    #update/set the visits cookie
+    request.session["visits"] = visits
+                                        
         
 
 

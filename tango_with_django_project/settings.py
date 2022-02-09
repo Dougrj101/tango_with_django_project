@@ -136,3 +136,6 @@ MEDIA_URL = '/media/'
 
 #restricted access
 LOGIN_URL = 'rango:login'
+
+#cookie stuff
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
